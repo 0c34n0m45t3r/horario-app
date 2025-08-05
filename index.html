@@ -26,9 +26,13 @@
   .color-orange { background-color: orange; }
   .color-blue { background-color: lightblue; }
   .color-purple { background-color: #800080; }
-  .half {
-    background-image: linear-gradient(to top left, currentColor 50%, transparent 50%);
-    background-color: currentColor;
+  .half-top {
+    background: linear-gradient(to top left, transparent 50%, currentColor 50%);
+    background-color: transparent;
+  }
+  .half-bottom {
+    background: linear-gradient(to top left, currentColor 50%, transparent 50%);
+    background-color: transparent;
   }
   #summary { padding: 10px; background: #f8f8f8; font-size: 0.9em; overflow-x: auto; }
   table { border-collapse: collapse; width: 100%; font-size: 0.85em; }
@@ -64,7 +68,7 @@ let data = JSON.parse(localStorage.getItem("workHours") || "{}");
 let halfHourMode = false;
 
 function buildGrid() {
-  // Celda modo medias horas (esquina sup. izq.)
+  // Celda modo medias horas
   const halfModeCell = document.createElement("div");
   halfModeCell.className = "header mode-button";
   halfModeCell.innerText = "½ h";
@@ -96,16 +100,35 @@ function buildGrid() {
       const key = `${day}-${hour}`;
       if (data[key]) cell.className = data[key];
 
-      cell.addEventListener("click", () => {
-        let currentColor = data[key]?.replace(" half", "") || "";
+      // Evento para click/touch
+      cell.addEventListener("click", (e) => {
+        let rect = cell.getBoundingClientRect();
+        let x = e.clientX || (e.touches && e.touches[0].clientX);
+        let y = e.clientY || (e.touches && e.touches[0].clientY);
+        let offsetX = x - rect.left;
+        let offsetY = y - rect.top;
+
+        let currentColor = data[key]?.replace(/ half-(top|bottom)/, "") || "";
         let idx = colors.indexOf(currentColor);
         idx = (idx + 1) % colors.length;
+
         if (!colors[idx]) {
           delete data[key];
           cell.className = "";
         } else {
-          data[key] = colors[idx] + (halfHourMode ? " half" : "");
-          cell.className = data[key];
+          if (halfHourMode) {
+            // Determinar si está por encima o debajo de la diagonal
+            if (offsetY < rect.height - (offsetX * rect.height / rect.width)) {
+              data[key] = colors[idx] + " half-top";
+              cell.className = data[key];
+            } else {
+              data[key] = colors[idx] + " half-bottom";
+              cell.className = data[key];
+            }
+          } else {
+            data[key] = colors[idx];
+            cell.className = data[key];
+          }
         }
         saveData();
         updateSummary();
@@ -128,7 +151,7 @@ function updateSummary() {
   Object.keys(data).forEach(key => {
     let [day, hour] = key.split("-").map(Number);
     let val = data[key];
-    let factor = val.includes("half") ? 0.5 : 1;
+    let factor = (val.includes("half-top") || val.includes("half-bottom")) ? 0.5 : 1;
     if (val.includes("orange")) dailyCounts[day].orange += factor;
     if (val.includes("blue")) dailyCounts[day].blue += factor;
     if (val.includes("purple")) dailyCounts[day].purple += factor;
