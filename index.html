@@ -21,24 +21,10 @@
     height: 40px;
     position: relative;
     cursor: pointer;
+    background-color: white;
+    background-size: cover;
   }
   .header { background: #eee; font-weight: bold; text-align: center; font-size: 0.85em; }
-
-  /* Colores con color de texto para que currentColor funcione */
-  .color-orange { background-color: orange; color: orange; }
-  .color-blue { background-color: lightblue; color: lightblue; }
-  .color-purple { background-color: #800080; color: #800080; }
-
-  /* Medias horas pintadas con currentColor */
-  .half-top {
-    background: linear-gradient(to top left, transparent 50%, currentColor 50%);
-    background-color: transparent !important;
-  }
-  .half-bottom {
-    background: linear-gradient(to top left, currentColor 50%, transparent 50%);
-    background-color: transparent !important;
-  }
-
   #summary { padding: 10px; background: #f8f8f8; font-size: 0.9em; overflow-x: auto; }
   table { border-collapse: collapse; width: 100%; font-size: 0.85em; }
   th, td { border: 1px solid #ccc; padding: 4px; text-align: center; }
@@ -66,14 +52,14 @@ if ('serviceWorker' in navigator) {
 const days = ["", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 const startHour = 5;
 const endHour = 22;
-const colors = ["", "color-orange", "color-blue", "color-purple"];
+const colors = ["", "orange", "lightblue", "#800080"];
 const grid = document.getElementById("grid");
 const summary = document.getElementById("summary");
-let data = JSON.parse(localStorage.getItem("workHours") || "{}");
+let data = JSON.parse(localStorage.getItem("workHoursV2") || "{}");
 let halfHourMode = false;
 
 function buildGrid() {
-  // Celda modo medias horas
+  // Botón modo medias horas
   const halfModeCell = document.createElement("div");
   halfModeCell.className = "header mode-button";
   halfModeCell.innerText = "½ h";
@@ -91,7 +77,7 @@ function buildGrid() {
     grid.appendChild(cell);
   }
 
-  // Horas y celdas
+  // Filas de horas
   for (let hour = startHour; hour <= endHour; hour++) {
     // Columna hora
     const hourCell = document.createElement("div");
@@ -99,13 +85,15 @@ function buildGrid() {
     hourCell.innerText = hour + ":00";
     grid.appendChild(hourCell);
 
-    // Días
+    // Celdas de cada día
     for (let day = 1; day <= 7; day++) {
       const cell = document.createElement("div");
       const key = `${day}-${hour}`;
-      if (data[key]) cell.className = data[key];
 
-      // Evento para click/touch
+      // Estado inicial
+      if (!data[key]) data[key] = { top: "", bottom: "" };
+      paintCell(cell, data[key]);
+
       cell.addEventListener("click", (e) => {
         let rect = cell.getBoundingClientRect();
         let x = e.clientX || (e.touches && e.touches[0].clientX);
@@ -113,27 +101,29 @@ function buildGrid() {
         let offsetX = x - rect.left;
         let offsetY = y - rect.top;
 
-        let currentClass = data[key] || "";
-        let currentColor = currentClass.replace(/ half-(top|bottom)/, "");
-        let idx = colors.indexOf(currentColor);
-        idx = (idx + 1) % colors.length;
-
-        if (!colors[idx]) {
-          delete data[key];
-          cell.className = "";
-        } else {
-          if (halfHourMode) {
-            // Determinar si está por encima o debajo de la diagonal
-            if (offsetY < rect.height - (offsetX * rect.height / rect.width)) {
-              data[key] = colors[idx] + " half-top";
-            } else {
-              data[key] = colors[idx] + " half-bottom";
-            }
+        if (halfHourMode) {
+          // Determinar parte superior o inferior
+          if (offsetY < rect.height - (offsetX * rect.height / rect.width)) {
+            // Superior
+            let idx = colors.indexOf(data[key].top);
+            idx = (idx + 1) % colors.length;
+            data[key].top = colors[idx] || "";
           } else {
-            data[key] = colors[idx];
+            // Inferior
+            let idx = colors.indexOf(data[key].bottom);
+            idx = (idx + 1) % colors.length;
+            data[key].bottom = colors[idx] || "";
           }
-          cell.className = data[key];
+        } else {
+          // Hora completa
+          let idx = colors.indexOf(data[key].top);
+          idx = (idx + 1) % colors.length;
+          let newColor = colors[idx] || "";
+          data[key].top = newColor;
+          data[key].bottom = newColor;
         }
+
+        paintCell(cell, data[key]);
         saveData();
         updateSummary();
       });
@@ -143,31 +133,43 @@ function buildGrid() {
   }
 }
 
+function paintCell(cell, halves) {
+  if (halves.top && halves.bottom) {
+    cell.style.background = `
+      linear-gradient(to top left, ${halves.bottom} 50%, transparent 50%),
+      linear-gradient(to top left, transparent 50%, ${halves.top} 50%)
+    `;
+  } else if (halves.top) {
+    cell.style.background = `linear-gradient(to top left, transparent 50%, ${halves.top} 50%)`;
+  } else if (halves.bottom) {
+    cell.style.background = `linear-gradient(to top left, ${halves.bottom} 50%, transparent 50%)`;
+  } else {
+    cell.style.background = "white";
+  }
+}
+
 function saveData() {
-  localStorage.setItem("workHours", JSON.stringify(data));
+  localStorage.setItem("workHoursV2", JSON.stringify(data));
 }
 
 function updateSummary() {
   let dailyCounts = {};
-  let totals = {orange: 0, blue: 0, purple: 0};
-  for (let d = 1; d <= 7; d++) dailyCounts[d] = {orange: 0, blue: 0, purple: 0};
+  let totals = {orange: 0, lightblue: 0, "#800080": 0};
+  for (let d = 1; d <= 7; d++) dailyCounts[d] = {orange: 0, lightblue: 0, "#800080": 0};
 
   Object.keys(data).forEach(key => {
-    let [day, hour] = key.split("-").map(Number);
-    let val = data[key];
-    let factor = (val.includes("half-top") || val.includes("half-bottom")) ? 0.5 : 1;
-    if (val.includes("orange")) dailyCounts[day].orange += factor;
-    if (val.includes("blue")) dailyCounts[day].blue += factor;
-    if (val.includes("purple")) dailyCounts[day].purple += factor;
+    let [day] = key.split("-").map(Number);
+    if (data[key].top) dailyCounts[day][data[key].top] += 0.5;
+    if (data[key].bottom) dailyCounts[day][data[key].bottom] += 0.5;
   });
 
   for (let d = 1; d <= 7; d++) {
     totals.orange += dailyCounts[d].orange;
-    totals.blue += dailyCounts[d].blue;
-    totals.purple += dailyCounts[d].purple;
+    totals.lightblue += dailyCounts[d].lightblue;
+    totals["#800080"] += dailyCounts[d]["#800080"];
   }
 
-  let totalAll = totals.orange + totals.blue + totals.purple;
+  let totalAll = totals.orange + totals.lightblue + totals["#800080"];
   let html = `<table>
     <tr>
       <th>Día</th>
@@ -179,12 +181,12 @@ function updateSummary() {
 
   const dayNames = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
   for (let d = 1; d <= 7; d++) {
-    let dayTotal = dailyCounts[d].orange + dailyCounts[d].blue + dailyCounts[d].purple;
+    let dayTotal = dailyCounts[d].orange + dailyCounts[d].lightblue + dailyCounts[d]["#800080"];
     html += `<tr>
       <td>${dayNames[d-1]}</td>
       <td>${dailyCounts[d].orange}</td>
-      <td>${dailyCounts[d].blue}</td>
-      <td>${dailyCounts[d].purple}</td>
+      <td>${dailyCounts[d].lightblue}</td>
+      <td>${dailyCounts[d]["#800080"]}</td>
       <td>${dayTotal}</td>
     </tr>`;
   }
@@ -192,8 +194,8 @@ function updateSummary() {
   html += `<tr style="font-weight:bold; background:#eee;">
     <td>Total semana</td>
     <td>${totals.orange}</td>
-    <td>${totals.blue}</td>
-    <td>${totals.purple}</td>
+    <td>${totals.lightblue}</td>
+    <td>${totals["#800080"]}</td>
     <td>${totalAll}</td>
   </tr></table>`;
 
