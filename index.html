@@ -5,9 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Horas de trabajo</title>
 <link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#000000">
+<link rel="icon" href="icon-192.png" type="image/png">
 <style>
   body { font-family: sans-serif; margin: 0; padding: 0; }
-  h1 { text-align: center; }
+  h1 { text-align: center; background: #000; color: #fff; padding: 10px; margin: 0; }
   .grid {
     display: grid;
     grid-template-columns: repeat(8, 1fr);
@@ -26,7 +28,7 @@
   .half {
     background: linear-gradient(to top left, transparent 49%, currentColor 51%);
   }
-  #summary { padding: 10px; }
+  #summary { padding: 10px; background: #f8f8f8; }
 </style>
 </head>
 <body>
@@ -35,6 +37,10 @@
 <div id="summary"></div>
 
 <script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('service-worker.js');
+}
+
 const days = ["", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 const startHour = 5;
 const endHour = 22;
@@ -44,7 +50,6 @@ const summary = document.getElementById("summary");
 let data = JSON.parse(localStorage.getItem("workHours") || "{}");
 
 function buildGrid() {
-  // Encabezados
   days.forEach(d => {
     const cell = document.createElement("div");
     cell.className = "header";
@@ -53,13 +58,11 @@ function buildGrid() {
   });
 
   for (let hour = startHour; hour <= endHour; hour++) {
-    // Hora en primera columna
     const hourCell = document.createElement("div");
     hourCell.className = "header";
     hourCell.innerText = hour+":00";
     grid.appendChild(hourCell);
 
-    // Días
     for (let day = 1; day <= 7; day++) {
       const cell = document.createElement("div");
       const key = `${day}-${hour}`;
@@ -102,9 +105,9 @@ function updateSummary() {
     if (val.includes("purple")) counts.purple += factor;
   });
   summary.innerHTML = `
-    Naranja (Docencia): ${counts.orange} h<br>
-    Azul (Investigación): ${counts.blue} h<br>
-    Morado (Administrativo): ${counts.purple} h
+    <strong>Naranja (Docencia):</strong> ${counts.orange} h<br>
+    <strong>Azul (Investigación):</strong> ${counts.blue} h<br>
+    <strong>Morado (Administrativo):</strong> ${counts.purple} h
   `;
 }
 
