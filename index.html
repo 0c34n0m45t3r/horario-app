@@ -12,23 +12,36 @@
   h1 { text-align: center; background: #000; color: #fff; padding: 10px; margin: 0; }
   .grid {
     display: grid;
-    grid-template-columns: repeat(8, 1fr);
+    grid-template-columns: repeat(8, minmax(35px, 1fr));
     border: 1px solid #ccc;
+    max-width: 100%;
   }
   .grid div {
     border: 1px solid #ccc;
-    width: 50px; height: 50px;
+    height: 40px;
     position: relative;
     cursor: pointer;
   }
-  .header { background: #eee; font-weight: bold; text-align: center; }
+  .header { background: #eee; font-weight: bold; text-align: center; font-size: 0.85em; }
   .color-orange { background-color: orange; }
   .color-blue { background-color: lightblue; }
-  .color-purple { background-color: violet; }
+  .color-purple { background-color: #800080; }
   .half {
-    background: linear-gradient(to top left, transparent 49%, currentColor 51%);
+    background-image: linear-gradient(to top left, currentColor 50%, transparent 50%);
+    background-color: currentColor;
   }
-  #summary { padding: 10px; background: #f8f8f8; }
+  #summary { padding: 10px; background: #f8f8f8; font-size: 0.9em; overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.85em; }
+  th, td { border: 1px solid #ccc; padding: 4px; text-align: center; }
+  th { background: #eee; }
+  .mode-button {
+    background: #ddd;
+    cursor: pointer;
+  }
+  .mode-button.active {
+    background: #4caf50;
+    color: white;
+  }
 </style>
 </head>
 <body>
@@ -48,45 +61,56 @@ const colors = ["", "color-orange", "color-blue", "color-purple"];
 const grid = document.getElementById("grid");
 const summary = document.getElementById("summary");
 let data = JSON.parse(localStorage.getItem("workHours") || "{}");
+let halfHourMode = false;
 
 function buildGrid() {
-  days.forEach(d => {
+  // Celda modo medias horas (esquina sup. izq.)
+  const halfModeCell = document.createElement("div");
+  halfModeCell.className = "header mode-button";
+  halfModeCell.innerText = "½ h";
+  halfModeCell.addEventListener("click", () => {
+    halfHourMode = !halfHourMode;
+    halfModeCell.classList.toggle("active", halfHourMode);
+  });
+  grid.appendChild(halfModeCell);
+
+  // Encabezados días
+  for (let i = 1; i <= 7; i++) {
     const cell = document.createElement("div");
     cell.className = "header";
-    cell.innerText = d;
+    cell.innerText = days[i];
     grid.appendChild(cell);
-  });
+  }
 
+  // Horas y celdas
   for (let hour = startHour; hour <= endHour; hour++) {
+    // Columna hora
     const hourCell = document.createElement("div");
     hourCell.className = "header";
-    hourCell.innerText = hour+":00";
+    hourCell.innerText = hour + ":00";
     grid.appendChild(hourCell);
 
+    // Días
     for (let day = 1; day <= 7; day++) {
       const cell = document.createElement("div");
       const key = `${day}-${hour}`;
       if (data[key]) cell.className = data[key];
+
       cell.addEventListener("click", () => {
-        let current = colors.indexOf(data[key] || "");
-        current = (current + 1) % colors.length;
-        data[key] = colors[current];
-        if (!colors[current]) delete data[key];
-        cell.className = colors[current];
-        saveData();
-        updateSummary();
-      });
-      cell.addEventListener("contextmenu", (e) => {
-        e.preventDefault();
-        if (data[key] && !data[key].includes("half")) {
-          data[key] += " half";
-        } else if (data[key]) {
-          data[key] = data[key].replace(" half", "");
+        let currentColor = data[key]?.replace(" half", "") || "";
+        let idx = colors.indexOf(currentColor);
+        idx = (idx + 1) % colors.length;
+        if (!colors[idx]) {
+          delete data[key];
+          cell.className = "";
+        } else {
+          data[key] = colors[idx] + (halfHourMode ? " half" : "");
+          cell.className = data[key];
         }
-        cell.className = data[key] || "";
         saveData();
         updateSummary();
       });
+
       grid.appendChild(cell);
     }
   }
@@ -97,18 +121,56 @@ function saveData() {
 }
 
 function updateSummary() {
-  let counts = {orange: 0, blue: 0, purple: 0};
-  Object.values(data).forEach(val => {
+  let dailyCounts = {};
+  let totals = {orange: 0, blue: 0, purple: 0};
+  for (let d = 1; d <= 7; d++) dailyCounts[d] = {orange: 0, blue: 0, purple: 0};
+
+  Object.keys(data).forEach(key => {
+    let [day, hour] = key.split("-").map(Number);
+    let val = data[key];
     let factor = val.includes("half") ? 0.5 : 1;
-    if (val.includes("orange")) counts.orange += factor;
-    if (val.includes("blue")) counts.blue += factor;
-    if (val.includes("purple")) counts.purple += factor;
+    if (val.includes("orange")) dailyCounts[day].orange += factor;
+    if (val.includes("blue")) dailyCounts[day].blue += factor;
+    if (val.includes("purple")) dailyCounts[day].purple += factor;
   });
-  summary.innerHTML = `
-    <strong>Naranja (Docencia):</strong> ${counts.orange} h<br>
-    <strong>Azul (Investigación):</strong> ${counts.blue} h<br>
-    <strong>Morado (Administrativo):</strong> ${counts.purple} h
-  `;
+
+  for (let d = 1; d <= 7; d++) {
+    totals.orange += dailyCounts[d].orange;
+    totals.blue += dailyCounts[d].blue;
+    totals.purple += dailyCounts[d].purple;
+  }
+
+  let totalAll = totals.orange + totals.blue + totals.purple;
+  let html = `<table>
+    <tr>
+      <th>Día</th>
+      <th>Naranja<br>(Docencia)</th>
+      <th>Azul<br>(Investigación)</th>
+      <th>Púrpura<br>(Administrativo)</th>
+      <th>Total día</th>
+    </tr>`;
+
+  const dayNames = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+  for (let d = 1; d <= 7; d++) {
+    let dayTotal = dailyCounts[d].orange + dailyCounts[d].blue + dailyCounts[d].purple;
+    html += `<tr>
+      <td>${dayNames[d-1]}</td>
+      <td>${dailyCounts[d].orange}</td>
+      <td>${dailyCounts[d].blue}</td>
+      <td>${dailyCounts[d].purple}</td>
+      <td>${dayTotal}</td>
+    </tr>`;
+  }
+
+  html += `<tr style="font-weight:bold; background:#eee;">
+    <td>Total semana</td>
+    <td>${totals.orange}</td>
+    <td>${totals.blue}</td>
+    <td>${totals.purple}</td>
+    <td>${totalAll}</td>
+  </tr></table>`;
+
+  summary.innerHTML = html;
 }
 
 buildGrid();
