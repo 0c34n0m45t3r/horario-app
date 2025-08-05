@@ -23,16 +23,16 @@
     cursor: pointer;
   }
   .header { background: #eee; font-weight: bold; text-align: center; font-size: 0.85em; }
-  .color-orange { background-color: orange; }
-  .color-blue { background-color: lightblue; }
-  .color-purple { background-color: #800080; }
+  .color-orange { background-color: orange; color: orange; }
+  .color-blue { background-color: lightblue; color: lightblue; }
+  .color-purple { background-color: #800080; color: #800080; }
   .half-top {
     background: linear-gradient(to top left, transparent 50%, currentColor 50%);
-    background-color: transparent;
+    background-color: transparent !important;
   }
   .half-bottom {
     background: linear-gradient(to top left, currentColor 50%, transparent 50%);
-    background-color: transparent;
+    background-color: transparent !important;
   }
   #summary { padding: 10px; background: #f8f8f8; font-size: 0.9em; overflow-x: auto; }
   table { border-collapse: collapse; width: 100%; font-size: 0.85em; }
@@ -108,7 +108,8 @@ function buildGrid() {
         let offsetX = x - rect.left;
         let offsetY = y - rect.top;
 
-        let currentColor = data[key]?.replace(/ half-(top|bottom)/, "") || "";
+        let currentClass = data[key] || "";
+        let currentColor = currentClass.replace(/ half-(top|bottom)/, "");
         let idx = colors.indexOf(currentColor);
         idx = (idx + 1) % colors.length;
 
@@ -120,15 +121,13 @@ function buildGrid() {
             // Determinar si está por encima o debajo de la diagonal
             if (offsetY < rect.height - (offsetX * rect.height / rect.width)) {
               data[key] = colors[idx] + " half-top";
-              cell.className = data[key];
             } else {
               data[key] = colors[idx] + " half-bottom";
-              cell.className = data[key];
             }
           } else {
             data[key] = colors[idx];
-            cell.className = data[key];
           }
+          cell.className = data[key];
         }
         saveData();
         updateSummary();
