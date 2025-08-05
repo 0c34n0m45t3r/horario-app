@@ -23,9 +23,13 @@
     cursor: pointer;
   }
   .header { background: #eee; font-weight: bold; text-align: center; font-size: 0.85em; }
+
+  /* Colores con color de texto para que currentColor funcione */
   .color-orange { background-color: orange; color: orange; }
   .color-blue { background-color: lightblue; color: lightblue; }
   .color-purple { background-color: #800080; color: #800080; }
+
+  /* Medias horas pintadas con currentColor */
   .half-top {
     background: linear-gradient(to top left, transparent 50%, currentColor 50%);
     background-color: transparent !important;
@@ -34,6 +38,7 @@
     background: linear-gradient(to top left, currentColor 50%, transparent 50%);
     background-color: transparent !important;
   }
+
   #summary { padding: 10px; background: #f8f8f8; font-size: 0.9em; overflow-x: auto; }
   table { border-collapse: collapse; width: 100%; font-size: 0.85em; }
   th, td { border: 1px solid #ccc; padding: 4px; text-align: center; }
