@@ -37,12 +37,27 @@
     background: #4caf50;
     color: white;
   }
+  #clearButton {
+    margin-top: 10px;
+    padding: 6px 12px;
+    background: #d9534f;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  #clearButton:hover {
+    background: #c9302c;
+  }
 </style>
 </head>
 <body>
 <h1>Horas de trabajo</h1>
 <div class="grid" id="grid"></div>
 <div id="summary"></div>
+<div style="padding:10px; text-align:center;">
+  <button id="clearButton">Borrar semana</button>
+</div>
 
 <script>
 if ('serviceWorker' in navigator) {
@@ -59,6 +74,8 @@ let data = JSON.parse(localStorage.getItem("workHoursV2") || "{}");
 let halfHourMode = false;
 
 function buildGrid() {
+  grid.innerHTML = "";
+
   // Botón modo medias horas
   const halfModeCell = document.createElement("div");
   halfModeCell.className = "header mode-button";
@@ -90,7 +107,6 @@ function buildGrid() {
       const cell = document.createElement("div");
       const key = `${day}-${hour}`;
 
-      // Estado inicial
       if (!data[key]) data[key] = { top: "", bottom: "" };
       paintCell(cell, data[key]);
 
@@ -102,20 +118,16 @@ function buildGrid() {
         let offsetY = y - rect.top;
 
         if (halfHourMode) {
-          // Determinar parte superior o inferior
           if (offsetY < rect.height - (offsetX * rect.height / rect.width)) {
-            // Superior
             let idx = colors.indexOf(data[key].top);
             idx = (idx + 1) % colors.length;
             data[key].top = colors[idx] || "";
           } else {
-            // Inferior
             let idx = colors.indexOf(data[key].bottom);
             idx = (idx + 1) % colors.length;
             data[key].bottom = colors[idx] || "";
           }
         } else {
-          // Hora completa
           let idx = colors.indexOf(data[key].top);
           idx = (idx + 1) % colors.length;
           let newColor = colors[idx] || "";
@@ -201,6 +213,16 @@ function updateSummary() {
 
   summary.innerHTML = html;
 }
+
+// Botón borrar semana
+document.getElementById("clearButton").addEventListener("click", () => {
+  if (confirm("¿Seguro que quieres borrar todos los datos de la semana?")) {
+    data = {};
+    localStorage.removeItem("workHoursV2");
+    buildGrid();
+    updateSummary();
+  }
+});
 
 buildGrid();
 updateSummary();
