@@ -67,7 +67,7 @@ if ('serviceWorker' in navigator) {
 const days = ["", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 const startHour = 5;
 const endHour = 22;
-const colors = ["", "orange", "lightblue", "#800080"];
+const colors = ["", "orange", "#0074D9", "#800080"]; // Royal blue
 const grid = document.getElementById("grid");
 const summary = document.getElementById("summary");
 let data = JSON.parse(localStorage.getItem("workHoursV2") || "{}");
@@ -166,8 +166,8 @@ function saveData() {
 
 function updateSummary() {
   let dailyCounts = {};
-  let totals = {orange: 0, lightblue: 0, "#800080": 0};
-  for (let d = 1; d <= 7; d++) dailyCounts[d] = {orange: 0, lightblue: 0, "#800080": 0};
+  let totals = {orange: 0, "#0074D9": 0, "#800080": 0};
+  for (let d = 1; d <= 7; d++) dailyCounts[d] = {orange: 0, "#0074D9": 0, "#800080": 0};
 
   Object.keys(data).forEach(key => {
     let [day] = key.split("-").map(Number);
@@ -177,11 +177,11 @@ function updateSummary() {
 
   for (let d = 1; d <= 7; d++) {
     totals.orange += dailyCounts[d].orange;
-    totals.lightblue += dailyCounts[d].lightblue;
+    totals["#0074D9"] += dailyCounts[d]["#0074D9"];
     totals["#800080"] += dailyCounts[d]["#800080"];
   }
 
-  let totalAll = totals.orange + totals.lightblue + totals["#800080"];
+  let totalAll = totals.orange + totals["#0074D9"] + totals["#800080"];
   let html = `<table>
     <tr>
       <th>Día</th>
@@ -193,11 +193,11 @@ function updateSummary() {
 
   const dayNames = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
   for (let d = 1; d <= 7; d++) {
-    let dayTotal = dailyCounts[d].orange + dailyCounts[d].lightblue + dailyCounts[d]["#800080"];
+    let dayTotal = dailyCounts[d].orange + dailyCounts[d]["#0074D9"] + dailyCounts[d]["#800080"];
     html += `<tr>
       <td>${dayNames[d-1]}</td>
       <td>${dailyCounts[d].orange}</td>
-      <td>${dailyCounts[d].lightblue}</td>
+      <td>${dailyCounts[d]["#0074D9"]}</td>
       <td>${dailyCounts[d]["#800080"]}</td>
       <td>${dayTotal}</td>
     </tr>`;
@@ -206,7 +206,7 @@ function updateSummary() {
   html += `<tr style="font-weight:bold; background:#eee;">
     <td>Total semana</td>
     <td>${totals.orange}</td>
-    <td>${totals.lightblue}</td>
+    <td>${totals["#0074D9"]}</td>
     <td>${totals["#800080"]}</td>
     <td>${totalAll}</td>
   </tr></table>`;
