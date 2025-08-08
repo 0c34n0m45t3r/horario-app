@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Horas de trabajo</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#000000" />
+  <link rel="icon" href="icon-192.png" type="image/png" />
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 0; }
+    h1 { text-align: center; background: #000; color: #fff; padding: 10px; margin: 0; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(8, minmax(35px, 1fr));
+      border: 1px solid #ccc;
+      max-width: 100%;
+    }
+    .grid div {
+      border: 1px solid #ccc;
+      height: 40px;
+      position: relative;
+      cursor: pointer;
+      background-color: white;
+      background-size: cover;
+    }
+    .header { background: #eee; font-weight: bold; text-align: center; font-size: 0.85em; }
+    #summary { padding: 10px; background: #f8f8f8; font-size: 0.9em; overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; font-size: 0.85em; }
+    th, td { border: 1px solid #ccc; padding: 4px; text-align: center; }
+    th { background: #eee; }
+    .mode-button { background: #ddd; cursor: pointer; }
+    .mode-button.active { background: #4caf50; color: white; }
+    #clearButton {
+      margin-top: 10px;
+      padding: 6px 12px;
+      background: #d9534f;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    #clearButton:hover { background: #c9302c; }
+  </style>
+</head>
+<body>
+  <h1>Horas de trabajo</h1>
+  <div class="grid" id="grid"></div>
+  <div id="summary"></div>
+  <div style="padding:10px; text-align:center;">
+    <button id="clearButton">Borrar semana</button>
+  </div>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js');
+    }
+
+    const days = ["", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+    const startHour = 5;
+    const endHour = 22;
+    const colors = ["", "orange", "#0074D9", "#800080", "#D7261E"]; // Rojo para libros
+    const grid = document.getElementById("grid");
+    const summary = document.getElementById("summary");
+    let data = JSON.parse(localStorage.getItem("workHoursV2") || "{}");
+    let halfHourMode = false;
+
+    function buildGrid() {
+      grid.innerHTML = "";
+      const halfModeCell = document.createElement("div");
+      halfModeCell.className = "header mode-button";
+      halfModeCell.innerText = "½ h";
+      halfModeCell.addEventListener("click", () => {
+        halfHourMode = !halfHourMode;
+        halfModeCell.classList.toggle("active", halfHourMode);
+      });
+      grid.appendChild(halfModeCell);
+      for (let i = 1; i <= 7; i++) {
+        const cell = document.createElement("div");
+        cell.className = "header";
+        cell.innerText = days[i];
+        grid.appendChild(cell);
+      }
+      for (let hour = startHour; hour <= endHour; hour++) {
+        const hourCell = document.createElement("div");
+        hourCell.className = "header";
+        hourCell.innerText = hour + ":00";
+        grid.appendChild(hourCell);
+        for (let day = 1; day <= 7; day++) {
+          const cell = document.createElement("div");
+          const key = `${day}-${hour}`;
+          if (!data[key]) data[key] = { top: "", bottom: "" };
+          paintCell(cell, data[key]);
+          cell.addEventListener("click", (e) => {
+            let rect = cell.getBoundingClientRect();
+            let x = e.clientX || (e.touches && e.touches[0].clientX);
+            let y = e.clientY || (e.touches && e.touches[0].clientY);
+            let offsetX = x - rect.left;
+            let offsetY = y - rect.top;
+            if (halfHourMode) {
+              if (offsetY < rect.height - (offsetX * rect.height / rect.width)) {
+                let idx = colors.indexOf(data[key].top);
+                idx = (idx + 1) % colors.length;
+                data[key].top = colors[idx] || "";
+              } else {
+                let idx = colors.indexOf(data[key].bottom);
+                idx = (idx + 1) % colors.length;
+                data[key].bottom = colors[idx] || "";
+              }
+            } else {
+              let idx = colors.indexOf(data[key].top);
+              idx = (idx + 1) % colors.length;
+              let newColor = colors[idx] || "";
+              data[key].top = newColor;
+              data[key].bottom = newColor;
+            }
+            paintCell(cell, data[key]);
+            saveData();
+            updateSummary();
+          });
+          grid.appendChild(cell);
+        }
+      }
+    }
+
+    function paintCell(cell, halves) {
+      if (halves.top && halves.bottom) {
+        cell.style.background = `
+          linear-gradient(to top left, ${halves.bottom} 50%, transparent 50%),
+          linear-gradient(to top left, transparent 50%, ${halves.top} 50%)
+        `;
+      } else if (halves.top) {
+        cell.style.background = `linear-gradient(to top left, transparent 50%, ${halves.top} 50%)`;
+      } else if (halves.bottom) {
+        cell.style.background = `linear-gradient(to top left, ${halves.bottom} 50%, transparent 50%)`;
+      } else {
+        cell.style.background = "white";
+      }
+    }
+
+    function saveData() {
+      localStorage.setItem("workHoursV2", JSON.stringify(data));
+    }
+
+    function updateSummary() {
+      let dailyCounts = {};
+      let totals = {orange: 0, "#0074D9": 0, "#800080": 0, "#D7261E": 0};
+      for (let d = 1; d <= 7; d++) dailyCounts[d] = {orange: 0, "#0074D9": 0, "#800080": 0, "#D7261E": 0};
+      Object.keys(data).forEach(key => {
+        let [day] = key.split("-").map(Number);
+        if (data[key].top) dailyCounts[day][data[key].top] += 0.5;
+        if (data[key].bottom) dailyCounts[day][data[key].bottom] += 0.5;
+      });
+      for (let d = 1; d <= 7; d++) {
+        totals.orange += dailyCounts[d].orange;
+        totals["#0074D9"] += dailyCounts[d]["#0074D9"];
+        totals["#800080"] += dailyCounts[d]["#800080"];
+        totals["#D7261E"] += dailyCounts[d]["#D7261E"];
+      }
+      let totalAll = totals.orange + totals["#0074D9"] + totals["#800080"] + totals["#D7261E"];
+      let html = `<table>
+        <tr>
+          <th>Día</th>
+          <th>Naranja<br>(Docencia)</th>
+          <th>Azul<br>(Investigación)</th>
+          <th>Púrpura<br>(Administrativo)</th>
+          <th>Rojo<br>(Libros)</th>
+          <th>Total día</th>
+        </tr>`;
+      const dayNames = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+      for (let d = 1; d <= 7; d++) {
+        let dayTotal = dailyCounts[d].orange + dailyCounts[d]["#0074D9"] + dailyCounts[d]["#800080"] + dailyCounts[d]["#D7261E"];
+        html += `<tr>
+          <td>${dayNames[d - 1]}</td>
+          <td>${dailyCounts[d].orange}</td>
+          <td>${dailyCounts[d]["#0074D9"]}</td>
+          <td>${dailyCounts[d]["#800080"]}</td>
+          <td>${dailyCounts[d]["#D7261E"]}</td>
+          <td>${dayTotal}</td>
+        </tr>`;
+      }
+      html += `<tr style="font-weight:bold; background:#eee;">
+        <td>Total semana</td>
+        <td>${totals.orange}</td>
+        <td>${totals["#0074D9"]}</td>
+        <td>${totals["#800080"]}</td>
+        <td>${totals["#D7261E"]}</td>
+        <td>${totalAll}</td>
+      </tr></table>`;
+      summary.innerHTML = html;
+    }
+
+    document.getElementById("clearButton").addEventListener("click", () => {
+      if (confirm("¿Seguro que quieres borrar todos los datos de la semana?")) {
+        data = {};
+        localStorage.removeItem("workHoursV2");
+        buildGrid();
+        updateSummary();
+      }
+    });
+
+    buildGrid();
+    updateSummary();
+  </script>
+</body>
+</html>
